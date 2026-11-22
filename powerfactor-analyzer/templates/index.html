@@ -6,27 +6,26 @@
     <title>PowerFactor Analyzer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <header class="topbar">
         <div class="brand">
-            <div class="brand-mark" aria-hidden="true">PF</div>
+            <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m13 2-9 12h7l-1 8 10-12h-7l1-8Z"/></svg></div>
             <div>
                 <h1>PowerFactor Analyzer</h1>
-                <p>Análise e Correção do Fator de Potência utilizando Números Complexos</p>
+                <p>Análise e correção do fator de potência de motores elétricos</p>
             </div>
         </div>
-        <div class="status-chip"><span></span> Sistema acadêmico</div>
+        <div class="status-chip"><span></span> Simulação acadêmica</div>
     </header>
 
     <main class="container">
         <section class="layout">
             <aside class="input-panel">
                 <div class="panel-heading">
-                    <span class="step">01</span>
                     <div>
                         <p class="eyebrow">Dados da instalação</p>
                         <h2>Parâmetros elétricos</h2>
@@ -34,25 +33,34 @@
                 </div>
 
                 <form id="analise-form">
+                    <label for="cenario">
+                        <span>Cenário simulado</span>
+                        <select id="cenario">
+                            {% for cenario in cenarios %}
+                            <option value="{{ loop.index0 }}" data-p="{{ cenario.p_kw }}" data-q="{{ cenario.q_kvar }}" data-fp="{{ cenario.fp_desejado }}">{{ cenario.nome }}</option>
+                            {% endfor %}
+                            <option value="personalizado">Carga personalizada</option>
+                        </select>
+                    </label>
                     <label for="p">
                         <span>Potência ativa <strong>P</strong></span>
                         <span class="field-unit">kW</span>
-                        <input id="p" name="p_kw" type="number" min="0.01" step="0.01" value="10" required>
+                        <input id="p" name="p_kw" type="number" min="0.01" step="0.01" value="{{ inicial.p_kw }}" required>
                     </label>
                     <label for="q">
                         <span>Potência reativa indutiva <strong>Q</strong></span>
                         <span class="field-unit">kVAr</span>
-                        <input id="q" name="q_kvar" type="number" min="0" step="0.01" value="7.5" required>
+                        <input id="q" name="q_kvar" type="number" min="0" step="0.01" value="{{ inicial.q_kvar }}" required>
                     </label>
                     <label for="fp">
                         <span>Fator de potência desejado</span>
                         <span class="field-unit">FP</span>
-                        <input id="fp" name="fp_desejado" type="number" min="0.01" max="1" step="0.01" value="0.95" required>
+                        <input id="fp" name="fp_desejado" type="number" min="0.01" max="1" step="0.01" value="{{ inicial.fp_desejado }}" required>
                     </label>
 
                     <button type="submit" id="analisar">
-                        <span>Analisar instalação</span>
-                        <span aria-hidden="true">→</span>
+                        <span id="analisar-label">Analisar cenário</span>
+                        <span class="button-icon" aria-hidden="true">→</span>
                     </button>
                     <p id="error-message" role="alert"></p>
                 </form>
@@ -60,51 +68,50 @@
 
             <section class="workspace">
                 <div class="panel-heading diagnosis-heading">
-                    <span class="step">02</span>
                     <div>
                         <p class="eyebrow">Diagnóstico energético</p>
-                        <h2>Resultados da análise</h2>
+                        <h2 id="cenario-analisado">Resultados da análise</h2>
                     </div>
                 </div>
 
-                <div id="diagnostico" class="diagnostic-banner warning">
-                    <span class="diagnostic-icon">!</span>
+                <div id="diagnostico" class="diagnostic-banner warning" role="status">
+                    <span class="diagnostic-icon" aria-hidden="true">…</span>
                     <div>
-                        <strong id="diagnostico-titulo">Fator de potência inadequado</strong>
-                        <p id="diagnostico-texto">O fator de potência atual está abaixo da meta definida.</p>
+                        <strong id="diagnostico-titulo">Aguardando análise</strong>
+                        <p id="diagnostico-texto">Resultados da última simulação aparecem aqui.</p>
                     </div>
                 </div>
 
                 <div class="metrics-grid">
                     <article class="metric">
-                        <p>Potência complexa</p>
-                        <strong id="potencia-complexa">10,0000 +7,5000j</strong>
-                        <span>kVA · forma retangular</span>
-                    </article>
-                    <article class="metric">
-                        <p>Potência aparente</p>
-                        <strong id="potencia-aparente">12,50 kVA</strong>
-                        <span>módulo de S</span>
-                    </article>
-                    <article class="metric">
-                        <p>Ângulo de defasagem</p>
-                        <strong id="angulo">36,87°</strong>
-                        <span>arg(S)</span>
-                    </article>
-                    <article class="metric">
                         <p>Fator de potência atual</p>
-                        <strong id="fp-atual">0,80</strong>
+                        <strong id="fp-atual">—</strong>
                         <span>P / |S|</span>
                     </article>
                     <article class="metric highlight">
                         <p>FP após compensação</p>
-                        <strong id="fp-novo">0,95</strong>
-                        <span>metas recalculada</span>
+                        <strong id="fp-novo">—</strong>
+                        <span>após correção de Q</span>
+                    </article>
+                    <article class="metric">
+                        <p>Potência aparente</p>
+                        <strong id="potencia-aparente">—</strong>
+                        <span>módulo de S</span>
                     </article>
                     <article class="metric highlight">
                         <p>Compensação reativa</p>
-                        <strong id="compensacao">4,21 kVAr</strong>
-                        <span>reativa indutiva a compensar</span>
+                        <strong id="compensacao">—</strong>
+                        <span>estimativa capacitiva</span>
+                    </article>
+                    <article class="metric metric-detail">
+                        <p>Potência complexa</p>
+                        <strong id="potencia-complexa">—</strong>
+                        <span id="potencia-polar">Forma polar</span>
+                    </article>
+                    <article class="metric metric-detail">
+                        <p>Ângulo de defasagem</p>
+                        <strong id="angulo">—</strong>
+                        <span>arg(S)</span>
                     </article>
                 </div>
             </section>
@@ -117,53 +124,94 @@
                         <p class="eyebrow">Plano complexo</p>
                         <h2>Triângulo de potências</h2>
                     </div>
-                    <div class="chart-legend"><span class="before"></span> Antes <span class="after"></span> Depois</div>
                 </div>
-                <canvas id="triangulo-chart"></canvas>
+                <div class="chart-legend" aria-label="Ângulos de defasagem">
+                    <span><i class="before" aria-hidden="true"></i> Antes <b id="angulo-antes">—</b></span>
+                    <span><i class="after" aria-hidden="true"></i> Depois <b id="angulo-depois">—</b></span>
+                </div>
+                <div class="chart-plot">
+                    <canvas id="triangulo-chart" role="img" aria-label="Triângulos de potência atual e corrigida no plano complexo"></canvas>
+                </div>
             </div>
             <div class="chart-card">
                 <div class="chart-header">
                     <div>
                         <p class="eyebrow">Resultado comparativo</p>
-                        <h2>Antes x depois</h2>
+                        <h2>Antes e depois</h2>
                     </div>
                 </div>
-                <canvas id="comparacao-chart"></canvas>
+                <div class="chart-plot">
+                    <canvas id="comparacao-chart" role="img" aria-label="Comparação do fator de potência e da potência aparente antes e depois da compensação"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="phasor-section chart-card">
+            <div class="chart-header">
+                <p class="eyebrow">Modelo equivalente</p>
+                <h2>Fasores RMS de tensão e corrente</h2>
+            </div>
+            <div class="phasor-layout">
+                <svg class="phasor-plot" viewBox="-0.13 -0.19 1.38 1.30" role="img" aria-labelledby="fasor-titulo fasor-descricao">
+                    <title id="fasor-titulo">Defasagem da corrente em relação à tensão</title>
+                    <desc id="fasor-descricao">A tensão é a referência horizontal de zero grau. A corrente indutiva aponta abaixo do eixo real. O arco marca a defasagem inicial.</desc>
+                    <defs>
+                        <marker id="seta-fasor" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4" markerHeight="4" orient="auto" markerUnits="strokeWidth">
+                            <path d="M 0 0 L 10 5 L 0 10 Z" fill="context-stroke"/>
+                        </marker>
+                    </defs>
+                    <path class="phasor-axis" d="M -.08 0 H 1.16 M 0 -.08 V 1.04"/>
+                    <line class="phasor-vector voltage" x2="1" marker-end="url(#seta-fasor)"/>
+                    <line id="corrente-antes-vetor" class="phasor-vector before" marker-end="url(#seta-fasor)"/>
+                    <line id="corrente-depois-vetor" class="phasor-vector after" marker-end="url(#seta-fasor)"/>
+                    <path id="defasagem-arco" class="phasor-arc"/>
+                </svg>
+                <div>
+                    <dl class="phasor-values">
+                        <div><dt>Tensão de referência</dt><dd>{{ tensao_rms_v }} V RMS ∠ 0°</dd></div>
+                        <div><dt>Corrente antes</dt><dd id="corrente-antes">—</dd></div>
+                        <div><dt>Corrente depois</dt><dd id="corrente-depois">—</dd></div>
+                    </dl>
+                    <p class="phasor-note">Potência inicial por V · conj(I): <strong id="potencia-recomposta">—</strong></p>
+                    <p class="phasor-note">Modelo monofásico equivalente da carga simulada. Os comprimentos das duas correntes usam a mesma escala, com referência na corrente inicial. A tensão tem escala própria. O arco indica o atraso inicial da corrente.</p>
+                </div>
             </div>
         </section>
 
         <section class="math-section">
             <div class="math-heading">
                 <p class="eyebrow">Fundamentação</p>
-                <h2>Variáveis Complexas aplicadas</h2>
+                <h2>Variáveis complexas aplicadas</h2>
             </div>
             <div class="math-grid">
                 <article>
-                    <span>01</span>
                     <h3>Potência complexa</h3>
                     <code>S = P + jQ</code>
-                    <p><b>P</b> é a parte real; <b>Q</b> é a parte imaginária da potência.</p>
+                    <p><b>P</b> é a parte real e <b>Q</b> é a parte imaginária da potência.</p>
                 </article>
                 <article>
-                    <span>02</span>
                     <h3>Módulo e argumento</h3>
                     <code>|S| = √(P² + Q²)<br>θ = arg(S)</code>
                     <p>O módulo é a potência aparente e o argumento é o ângulo de defasagem.</p>
                 </article>
                 <article>
-                    <span>03</span>
                     <h3>Forma polar</h3>
                     <code>S = |S| · e<sup>jθ</sup></code>
                     <p>Representação da potência no plano complexo.</p>
                 </article>
                 <article>
-                    <span>04</span>
+                    <h3>Conjugado complexo</h3>
+                    <code>S = V · conj(I)</code>
+                    <p>No modelo equivalente, V e I são fasores RMS. O conjugado de I troca o sinal da parte imaginária, produzindo Q positivo na carga indutiva.</p>
+                </article>
+                <article>
                     <h3>Compensação reativa</h3>
                     <code>Qc = P[tg θ atual − tg θ desejado]</code>
                     <p><b>Qnovo = Q − Qc</b> recalcula a potência complexa corrigida.</p>
                 </article>
             </div>
         </section>
+        <p class="phasor-note">Simulação didática com cargas hipotéticas. Os resultados não representam medições, correções físicas ou dimensionamento de capacitores.</p>
     </main>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>

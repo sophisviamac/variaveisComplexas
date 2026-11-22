@@ -1,5 +1,13 @@
 const form = document.querySelector("#analise-form");
 const errorMessage = document.querySelector("#error-message");
+const analyzeButton = document.querySelector("#analisar");
+const analyzeLabel = document.querySelector("#analisar-label");
+const scenario = document.querySelector("#cenario");
+const fields = {
+    p: document.querySelector("#p"),
+    q: document.querySelector("#q"),
+    fp: document.querySelector("#fp"),
+};
 
 let trianguloChart;
 let comparacaoChart;
@@ -12,8 +20,27 @@ function formatNumber(value, digits = 2) {
 }
 
 function initCharts() {
-    Chart.defaults.font.family = "DM Sans";
-    Chart.defaults.color = "#6d7f8d";
+    const styles = getComputedStyle(document.documentElement);
+    const color = (name) => styles.getPropertyValue(name).trim();
+    const before = color("--before");
+    const after = color("--after");
+    const grid = { color: color("--line") };
+    const border = { color: color("--line") };
+
+    Chart.defaults.font.family = "Inter, system-ui, sans-serif";
+    Chart.defaults.color = color("--muted");
+    Chart.defaults.locale = "pt-BR";
+    Object.assign(Chart.defaults.plugins.tooltip, {
+        backgroundColor: color("--inset"),
+        titleColor: color("--text"),
+        bodyColor: color("--text"),
+        borderColor: color("--line"),
+        borderWidth: 1,
+        padding: 10,
+    });
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        Chart.defaults.animation = false;
+    }
 
     const trianguloContext = document.querySelector("#triangulo-chart");
     trianguloChart = new Chart(trianguloContext, {
@@ -22,9 +49,9 @@ function initCharts() {
             datasets: [
                 {
                     label: "Triângulo atual",
-                    data: [{x: 0, y: 0}, {x: 10, y: 0}, {x: 10, y: 7.5}, {x: 0, y: 0}],
-                    borderColor: "#2f74a5",
-                    backgroundColor: "rgba(47,116,165,.12)",
+                    data: [],
+                    borderColor: before,
+                    backgroundColor: before + "22",
                     borderWidth: 2,
                     fill: true,
                     showLine: true,
@@ -32,9 +59,10 @@ function initCharts() {
                 },
                 {
                     label: "Triângulo corrigido",
-                    data: [{x: 0, y: 0}, {x: 10, y: 0}, {x: 10, y: 3.29}, {x: 0, y: 0}],
-                    borderColor: "#138a72",
-                    backgroundColor: "rgba(19,138,114,.09)",
+                    data: [],
+                    borderColor: after,
+                    backgroundColor: after + "18",
+                    borderDash: [6, 4],
                     borderWidth: 2,
                     fill: true,
                     showLine: true,
@@ -45,10 +73,18 @@ function initCharts() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ({dataset, parsed}) =>
+                            `${dataset.label} · P ${formatNumber(parsed.x)} kW · Q ${formatNumber(parsed.y)} kVAr`,
+                    },
+                },
+            },
             scales: {
-                x: { title: { display: true, text: "Potência ativa P (kW)" }, beginAtZero: true, grid: { color: "#edf1f3" } },
-                y: { title: { display: true, text: "Potência reativa Q (kVAr)" }, beginAtZero: true, grid: { color: "#edf1f3" } },
+                x: { title: { display: true, text: "P · eixo real (kW)" }, beginAtZero: true, grid, border },
+                y: { title: { display: true, text: "Q · eixo imaginário (kVAr)" }, beginAtZero: true, grid, border },
             },
         },
     });
@@ -57,29 +93,62 @@ function initCharts() {
     comparacaoChart = new Chart(comparacaoContext, {
         type: "bar",
         data: {
-            labels: ["Fator de potência", "Potência aparente"],
+            labels: ["Fator de potência", ["Potência aparente", "(kVA)"]],
             datasets: [
-                { label: "Antes", data: [0.8, 12.5], backgroundColor: "#2f74a5", borderRadius: 4, maxBarThickness: 42 },
-                { label: "Depois", data: [0.95, 10.53], backgroundColor: "#55a7a3", borderRadius: 4, maxBarThickness: 42 },
+                { label: "Antes", data: [], backgroundColor: before, borderRadius: 5, maxBarThickness: 42 },
+                { label: "Depois", data: [], backgroundColor: after, borderRadius: 5, maxBarThickness: 42 },
             ],
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: "bottom", labels: { boxWidth: 8, usePointStyle: true } } },
+            plugins: {
+                legend: { position: "bottom", labels: { boxWidth: 8, usePointStyle: true } },
+                tooltip: {
+                    callbacks: {
+                        title: ([item]) => item.dataIndex === 0 ? "Fator de potência" : "Potência aparente",
+                        label: ({dataset, parsed, dataIndex}) =>
+                            `${dataset.label}: ${formatNumber(parsed.y)}${dataIndex === 1 ? " kVA" : ""}`,
+                    },
+                },
+            },
             scales: {
-                x: { grid: { display: false } },
-                y: { beginAtZero: true, title: { display: true, text: "Valor / escala mista" }, grid: { color: "#edf1f3" } },
+                x: { ticks: { maxRotation: 0 }, grid: { display: false }, border },
+                y: { beginAtZero: true, title: { display: true, text: "Valor / escala mista" }, grid, border },
             },
         },
     });
 }
 
-function updateUI(resultado) {
-    const complexa = resultado.potencia_complexa.retangular;
-    document.querySelector("#potencia-complexa").textContent = complexa.replace(" kVA", "");
+function updatePhasors(fasores) {
+    for (const estado of ["antes", "depois"]) {
+        const {corrente_rms_a, angulo_graus, vetor} = fasores[estado];
+        const line = document.querySelector(`#corrente-${estado}-vetor`);
+        line.setAttribute("x2", vetor.x);
+        line.setAttribute("y2", vetor.y);
+        document.querySelector(`#corrente-${estado}`).textContent =
+            `${formatNumber(corrente_rms_a)} A RMS ∠ ${formatNumber(angulo_graus)}°`;
+    }
+
+    const {arco, angulo_graus} = fasores.antes;
+    document.querySelector("#defasagem-arco").setAttribute("d",
+        angulo_graus === 0 ? "" : `M .29 0 A .29 .29 0 0 1 ${arco.x} ${arco.y}`);
+    const {potencia_recomposta_kw, potencia_recomposta_kvar} = fasores.antes;
+    document.querySelector("#potencia-recomposta").textContent =
+        `${formatNumber(potencia_recomposta_kw)} + j${formatNumber(potencia_recomposta_kvar)} kVA`;
+}
+
+function updateUI(resultado, scenarioName) {
+    const {modulo_kva, argumento_graus} = resultado.potencia_complexa;
+    document.querySelector("#cenario-analisado").textContent = scenarioName;
+    document.querySelector("#potencia-complexa").textContent =
+        `${formatNumber(resultado.entrada.p_kw, 4)} + j${formatNumber(resultado.entrada.q_kvar, 4)} kVA`;
+    document.querySelector("#potencia-polar").textContent =
+        `Forma polar · ${formatNumber(modulo_kva)} kVA ∠ ${formatNumber(argumento_graus)}°`;
     document.querySelector("#potencia-aparente").textContent = `${formatNumber(resultado.potencia_aparente_kva)} kVA`;
     document.querySelector("#angulo").textContent = `${formatNumber(resultado.angulo_graus)}°`;
+    document.querySelector("#angulo-antes").textContent = `${formatNumber(resultado.angulo_graus)}°`;
+    document.querySelector("#angulo-depois").textContent = `${formatNumber(resultado.angulo_novo_graus)}°`;
     document.querySelector("#fp-atual").textContent = formatNumber(resultado.fp_atual);
     document.querySelector("#fp-novo").textContent = formatNumber(resultado.fp_novo);
     document.querySelector("#compensacao").textContent = `${formatNumber(resultado.qc_kvar)} kVAr`;
@@ -93,6 +162,8 @@ function updateUI(resultado) {
     icone.textContent = resultado.atende_meta ? "✓" : "!";
     titulo.textContent = resultado.atende_meta ? "Fator de potência adequado" : "Fator de potência inadequado";
     texto.textContent = resultado.diagnostico;
+    updatePhasors(resultado.fasores);
+    if (!trianguloChart || !comparacaoChart) return;
 
     const p = resultado.entrada.p_kw;
     const q = resultado.entrada.q_kvar;
@@ -100,12 +171,8 @@ function updateUI(resultado) {
     const maxQ = Math.max(q, qNovo, p * 0.2) * 1.18;
     const maxP = p * 1.18;
 
-    trianguloChart.data.datasets[0].data = [
-        {x: 0, y: 0}, {x: p, y: 0}, {x: p, y: q}, {x: 0, y: 0},
-    ];
-    trianguloChart.data.datasets[1].data = [
-        {x: 0, y: 0}, {x: p, y: 0}, {x: p, y: qNovo}, {x: 0, y: 0},
-    ];
+    trianguloChart.data.datasets[0].data = resultado.triangulos[0];
+    trianguloChart.data.datasets[1].data = resultado.triangulos[1];
     trianguloChart.options.scales.x.suggestedMax = maxP;
     trianguloChart.options.scales.y.suggestedMax = maxQ;
     trianguloChart.update();
@@ -115,14 +182,32 @@ function updateUI(resultado) {
     comparacaoChart.update();
 }
 
+scenario.addEventListener("change", () => {
+    if (scenario.value === "personalizado") return;
+    const {dataset} = scenario.selectedOptions[0];
+    for (const [key, field] of Object.entries(fields)) {
+        field.value = dataset[key];
+    }
+    form.requestSubmit();
+});
+
+for (const field of Object.values(fields)) {
+    field.addEventListener("input", () => { scenario.value = "personalizado"; });
+}
+
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (analyzeButton.disabled) return;
     errorMessage.textContent = "";
+    analyzeButton.disabled = true;
+    scenario.disabled = true;
+    analyzeLabel.textContent = "Analisando…";
 
+    const scenarioName = scenario.selectedOptions[0].textContent.trim();
     const body = {
-        p_kw: document.querySelector("#p").value,
-        q_kvar: document.querySelector("#q").value,
-        fp_desejado: document.querySelector("#fp").value,
+        p_kw: fields.p.value,
+        q_kvar: fields.q.value,
+        fp_desejado: fields.fp.value,
     };
 
     try {
@@ -134,23 +219,24 @@ form.addEventListener("submit", async (event) => {
         const resultado = await response.json();
 
         if (!response.ok) {
-            throw new Error(resultado.error || "Nao foi possivel realizar a analise.");
+            throw new Error(resultado.error || "Não foi possível realizar a análise.");
         }
 
-        updateUI(resultado);
+        updateUI(resultado, scenarioName);
     } catch (error) {
         errorMessage.textContent = error.message;
+    } finally {
+        analyzeButton.disabled = false;
+        scenario.disabled = false;
+        analyzeLabel.textContent = "Analisar cenário";
     }
 });
 
-initCharts();
-
-fetch("/api/analisar", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({p_kw: 10, q_kvar: 7.5, fp_desejado: 0.95}),
-})
-    .then((response) => response.json())
-    .then((resultado) => {
-        if (!resultado.error) updateUI(resultado);
+if (typeof Chart === "undefined") {
+    document.querySelectorAll(".chart-plot").forEach((plot) => {
+        plot.textContent = "Gráfico indisponível. Recarregue a página para tentar novamente.";
     });
+} else {
+    initCharts();
+}
+form.requestSubmit();
