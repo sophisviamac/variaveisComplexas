@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PowerFactor Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-mark" aria-hidden="true">PF</div>
+            <div>
+                <h1>PowerFactor Analyzer</h1>
+                <p>Análise e Correção do Fator de Potência utilizando Números Complexos</p>
+            </div>
+        </div>
+        <div class="status-chip"><span></span> Sistema acadêmico</div>
+    </header>
+
+    <main class="container">
+        <section class="layout">
+            <aside class="input-panel">
+                <div class="panel-heading">
+                    <span class="step">01</span>
+                    <div>
+                        <p class="eyebrow">Dados da instalação</p>
+                        <h2>Parâmetros elétricos</h2>
+                    </div>
+                </div>
+
+                <form id="analise-form">
+                    <label for="p">
+                        <span>Potência ativa <strong>P</strong></span>
+                        <span class="field-unit">kW</span>
+                        <input id="p" name="p_kw" type="number" min="0.01" step="0.01" value="10" required>
+                    </label>
+                    <label for="q">
+                        <span>Potência reativa indutiva <strong>Q</strong></span>
+                        <span class="field-unit">kVAr</span>
+                        <input id="q" name="q_kvar" type="number" min="0" step="0.01" value="7.5" required>
+                    </label>
+                    <label for="fp">
+                        <span>Fator de potência desejado</span>
+                        <span class="field-unit">FP</span>
+                        <input id="fp" name="fp_desejado" type="number" min="0.01" max="1" step="0.01" value="0.95" required>
+                    </label>
+
+                    <button type="submit" id="analisar">
+                        <span>Analisar instalação</span>
+                        <span aria-hidden="true">→</span>
+                    </button>
+                    <p id="error-message" role="alert"></p>
+                </form>
+            </aside>
+
+            <section class="workspace">
+                <div class="panel-heading diagnosis-heading">
+                    <span class="step">02</span>
+                    <div>
+                        <p class="eyebrow">Diagnóstico energético</p>
+                        <h2>Resultados da análise</h2>
+                    </div>
+                </div>
+
+                <div id="diagnostico" class="diagnostic-banner warning">
+                    <span class="diagnostic-icon">!</span>
+                    <div>
+                        <strong id="diagnostico-titulo">Fator de potência inadequado</strong>
+                        <p id="diagnostico-texto">O fator de potência atual está abaixo da meta definida.</p>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <article class="metric">
+                        <p>Potência complexa</p>
+                        <strong id="potencia-complexa">10,0000 +7,5000j</strong>
+                        <span>kVA · forma retangular</span>
+                    </article>
+                    <article class="metric">
+                        <p>Potência aparente</p>
+                        <strong id="potencia-aparente">12,50 kVA</strong>
+                        <span>módulo de S</span>
+                    </article>
+                    <article class="metric">
+                        <p>Ângulo de defasagem</p>
+                        <strong id="angulo">36,87°</strong>
+                        <span>arg(S)</span>
+                    </article>
+                    <article class="metric">
+                        <p>Fator de potência atual</p>
+                        <strong id="fp-atual">0,80</strong>
+                        <span>P / |S|</span>
+                    </article>
+                    <article class="metric highlight">
+                        <p>FP após compensação</p>
+                        <strong id="fp-novo">0,95</strong>
+                        <span>metas recalculada</span>
+                    </article>
+                    <article class="metric highlight">
+                        <p>Compensação reativa</p>
+                        <strong id="compensacao">4,21 kVAr</strong>
+                        <span>reativa indutiva a compensar</span>
+                    </article>
+                </div>
+            </section>
+        </section>
+
+        <section class="charts-section">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <p class="eyebrow">Plano complexo</p>
+                        <h2>Triângulo de potências</h2>
+                    </div>
+                    <div class="chart-legend"><span class="before"></span> Antes <span class="after"></span> Depois</div>
+                </div>
+                <canvas id="triangulo-chart"></canvas>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <p class="eyebrow">Resultado comparativo</p>
+                        <h2>Antes x depois</h2>
+                    </div>
+                </div>
+                <canvas id="comparacao-chart"></canvas>
+            </div>
+        </section>
+
+        <section class="math-section">
+            <div class="math-heading">
+                <p class="eyebrow">Fundamentação</p>
+                <h2>Variáveis Complexas aplicadas</h2>
+            </div>
+            <div class="math-grid">
+                <article>
+                    <span>01</span>
+                    <h3>Potência complexa</h3>
+                    <code>S = P + jQ</code>
+                    <p><b>P</b> é a parte real; <b>Q</b> é a parte imaginária da potência.</p>
+                </article>
+                <article>
+                    <span>02</span>
+                    <h3>Módulo e argumento</h3>
+                    <code>|S| = √(P² + Q²)<br>θ = arg(S)</code>
+                    <p>O módulo é a potência aparente e o argumento é o ângulo de defasagem.</p>
+                </article>
+                <article>
+                    <span>03</span>
+                    <h3>Forma polar</h3>
+                    <code>S = |S| · e<sup>jθ</sup></code>
+                    <p>Representação da potência no plano complexo.</p>
+                </article>
+                <article>
+                    <span>04</span>
+                    <h3>Compensação reativa</h3>
+                    <code>Qc = P[tg θ atual − tg θ desejado]</code>
+                    <p><b>Qnovo = Q − Qc</b> recalcula a potência complexa corrigida.</p>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
